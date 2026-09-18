@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flushgopher</title>
+<style>
+  :root {
+    --bg: #fafaf8; --card: #ffffff; --fg: #1b1b19; --muted: #74736d; --line: #e7e6e1;
+    --track: #efeee9; --go: #0a9bbf; --orig: #d9674f; --good: #2f8a4c; --code: #f3f2ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121211; --card: #1a1a19; --fg: #ecebe7; --muted: #8f8e88; --line: #292927;
+      --track: #252523; --go: #3fc4e4; --orig: #e8806a; --good: #6cc488; --code: #202020;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
+  main { max-width: 1240px; margin: 0 auto; padding: 56px 32px 80px; }
+  code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.86em; }
+  a { color: var(--go); }
+
+  header { display: flex; align-items: end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  h1 { font-size: 2.6rem; margin: 0; letter-spacing: -0.03em; }
+  h1 span { color: var(--go); font-weight: 400; margin-right: 12px; }
+  .tag { color: var(--muted); margin: 6px 0 0; }
+  .legend { display: flex; gap: 18px; color: var(--muted); font-size: 0.85rem; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  .grid { display: grid; gap: 16px; margin-top: 32px; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g2 { grid-template-columns: 1.4fr 1fr; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; }
+  .card h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 18px; font-weight: 600; }
+
+  .big { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .big small { font-size: 0.9rem; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 6px; }
+  .vs { color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+  .vs b { color: var(--orig); font-weight: 600; }
+
+  .bar { display: grid; grid-template-columns: 90px 1fr 64px; align-items: center; gap: 12px; margin: 12px 0; font-size: 0.88rem; }
+  .bar .t { height: 12px; background: var(--track); border-radius: 6px; overflow: hidden; }
+  .bar .f { height: 100%; border-radius: 6px; }
+  .bar .v { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .o .f { background: var(--orig); } .n .f { background: var(--go); }
+
+  .timeline { position: relative; height: 34px; background: var(--track); border-radius: 8px; margin: 6px 0 4px; }
+  .timeline i { position: absolute; top: 7px; width: 3px; height: 20px; border-radius: 2px; background: var(--orig); opacity: 0.85; }
+  .timeline.go i { background: var(--go); width: 6px; }
+  .timeline em { position: absolute; top: 8px; font-style: normal; font-size: 0.78rem; color: var(--go); font-weight: 600; }
+  .row-label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 16px; }
+  .row-label span { color: var(--muted); }
+  .axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.75rem; margin-top: 6px; font-variant-numeric: tabular-nums; }
+
+  .match { display: flex; gap: 4px; margin: 4px 0 14px; }
+  .match i { flex: 1; height: 26px; border-radius: 4px; background: var(--go); opacity: 0.8; }
+  .match i.d { background: var(--good); opacity: 1; }
+  .diff { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 0.86rem; margin-top: 8px; }
+  .diff .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-top: 6px; }
+  .diff s { color: var(--orig); text-decoration: none; }
+  .diff b { color: var(--good); font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  td { padding: 11px 0; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: 0; }
+  td.c { text-align: center; width: 120px; font-size: 1.05rem; }
+  th { white-space: nowrap; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; text-align: center; padding-bottom: 8px; }
+  th:first-child { text-align: left; }
+  .y { color: var(--good); } .x { color: var(--orig); }
+
+  pre { background: var(--code); border-radius: 10px; padding: 14px 16px; margin: 0 0 12px; overflow-x: auto; line-height: 1.6; }
+  pre b { color: var(--go); font-weight: 600; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .steps pre { margin: 0; }
+  .step { color: var(--muted); font-size: 0.82rem; margin-bottom: 8px; }
+  .step span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--go); color: var(--bg); font-weight: 700; font-size: 0.72rem; margin-right: 8px; }
+  @media (max-width: 900px) { .steps { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .g3, .g2 { grid-template-columns: 1fr; } main { padding: 36px 16px 60px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1><span>ʕ◔ϖ◔ʔ</span>flushgopher</h1>
+      <p class="tag">Magento 2 cache cleaner in Go · same rules as <a href="https://github.com/mage-os/magento-cache-clean">magento-cache-clean</a>, calmer engine</p>
+    </div>
+    <div class="legend"><span><i style="background:var(--orig)"></i>cache-clean.js</span><span><i style="background:var(--go)"></i>flushgopher</span></div>
+  </header>
+
+  <div class="grid g3">
+    <div class="card">
+      <h2>Cleans per branch switch</h2>
+      <div class="big">1<small>batch</small></div>
+      <div class="vs">original: <b>41 cleans</b></div>
+      <div class="bar o"><span>original</span><div class="t"><div class="f" style="width:100%"></div></div><span class="v">41</span></div>
+      <div class="bar n"><span>flushgopher</span><div class="t"><div class="f" style="width:17%"></div></div><span class="v">7</span></div>
+    </div>
+    <div class="card">
+      <h2>Settled after checkout</h2>
+      <div class="big">2.3<small>s</small></div>
+      <div class="vs">original: <b>42.3 s+</b> and still cleaning</div>
+      <div class="bar o"><span>original</span><div class="t"><div class="f" style="width:100%"></div></div><span class="v">42.3 s</span></div>
+      <div class="bar n"><span>flushgopher</span><div class="t"><div class="f" style="width:5.4%"></div></div><span class="v">2.3 s</span></div>
+    </div>
+    <div class="card">
+      <h2>Module discovery · 835 components</h2>
+      <div class="big">22<small>ms</small></div>
+      <div class="vs">original (via php): <b>~300 ms</b></div>
+      <div class="bar o"><span>php</span><div class="t"><div class="f" style="width:100%"></div></div><span class="v">300 ms</span></div>
+      <div class="bar n"><span>native Go</span><div class="t"><div class="f" style="width:7.3%"></div></div><span class="v">22 ms</span></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Every cache clean after a git checkout of 1,079 files · proforto</h2>
+      <div class="row-label"><strong>cache-clean.js</strong><span>41 cleans over 42 s</span></div>
+      <div class="timeline" id="orig"></div>
+      <div class="row-label"><strong>flushgopher</strong><span>1 batch at 2.3 s</span></div>
+      <div class="timeline go"><i style="left:5.1%"></i><em style="left:calc(5.1% + 14px)">one batch · 7 ops</em></div>
+      <div class="axis"><span>0 s</span><span>15 s</span><span>30 s</span><span>45 s</span></div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h2>Feature comparison</h2>
+      <table>
+        <tr><th></th><th>cache-clean.js</th><th>flushgopher</th></tr>
+        <tr><td>Batches changes into one clean</td><td class="c x">✕</td><td class="c y">✓</td></tr>
+        <tr><td>Waits out branch switches &amp; <code>setup:upgrade</code></td><td class="c x">✕</td><td class="c y">✓</td></tr>
+        <tr><td>Skips unchanged files &amp; replayed events</td><td class="c x">✕</td><td class="c y">✓</td></tr>
+        <tr><td>Works without PHP / broken autoloader</td><td class="c x">✕</td><td class="c y">✓</td></tr>
+        <tr><td>Persistent, pipelined redis connection</td><td class="c x">✕</td><td class="c y">✓</td></tr>
+        <tr><td>Picks up new / removed modules instantly</td><td class="c x">✕</td><td class="c y">✓</td></tr>
+        <tr><td>Git worktree aware</td><td class="c x">✕</td><td class="c y">✓</td></tr>
+        <tr><td>Hotkeys for manual cleaning</td><td class="c y">✓</td><td class="c y">✓</td></tr>
+        <tr><td>Runtime</td><td class="c" style="color:var(--muted)">Node + PHP</td><td class="c" style="color:var(--muted)">1 binary</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h2>Same edits, same redis commands</h2>
+      <div class="big">35<small>/ 37 steps identical</small></div>
+      <div class="match" id="match"></div>
+      <div class="diff">
+        <span class="dot"></span><span><code>.svg</code> edit · <s>HYVA_SVG</s> → <b>HYVA_ICONS</b> (Hyvä's real tag)</span>
+        <span class="dot"></span><span>unchanged rewrite · <s>cleans config</s> → <b>skipped</b></span>
+        <span class="dot"></span><span><code>abstract class</code> · <s>interceptor kept</s> → <b>removed</b></span>
+      </div>
+      <h2 style="margin-top:28px">Usage</h2>
+<pre><b>flushgopher -w</b>          watch
+<b>flushgopher</b>             flush all
+<b>flushgopher</b> config      clean types</pre>
+<pre><b>c</b> config  <b>b</b> block  <b>l</b> layout  <b>t</b> translate
+<b>f</b> fpc  <b>v</b> view  <b>m</b> misc  <b>a</b> all  <b>G</b> generated
+<b>F</b> <b>A</b> static  <b>I</b> sandboxes  <b>r</b> rescan  <b>q</b> quit</pre>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Install</h2>
+      <div class="steps">
+        <div><div class="step"><span>1</span>clone</div>
+<pre>git clone git@github.com:AVMG20/flushgopher.git
+cd flushgopher</pre></div>
+        <div><div class="step"><span>2</span>build → ~/.local/bin</div>
+<pre><b>make install</b></pre></div>
+        <div><div class="step"><span>3</span>alias in ~/.zshrc</div>
+<pre>echo "alias cl='$HOME/.local/bin/flushgopher -w'" \
+  >> ~/.zshrc && source ~/.zshrc</pre></div>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+  // Seconds after the checkout at which cache-clean.js sent a clean (redis MONITOR).
+  const orig = [1.9,1.9,1.9,1.9,2.7,3.5,3.5,4.3,6.3,6.3,7.4,8.0,9.4,9.8,10.5,10.5,11.9,13.3,15.1,15.9,15.9,17.5,19.6,20.6,23.1,25.5,25.5,26.7,28.0,28.8,29.8,30.8,33.5,33.5,33.9,36.8,37.4,39.5,40.3,41.1,42.3];
+  const el = document.getElementById('orig');
+  for (const t of orig) {
+    const i = document.createElement('i');
+    i.style.left = (t / 45 * 100) + '%';
+    el.appendChild(i);
+  }
+  const m = document.getElementById('match');
+  for (let n = 0; n < 37; n++) {
+    const i = document.createElement('i');
+    if (n >= 35) { i.className = 'd'; i.title = 'differs, in flushgopher\'s favor'; }
+    m.appendChild(i);
+  }
+</script>
+</body>
+</html>
