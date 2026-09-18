@@ -54,13 +54,6 @@
   .row-label span { color: var(--muted); }
   .axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.75rem; margin-top: 6px; font-variant-numeric: tabular-nums; }
 
-  .match { display: flex; gap: 4px; margin: 4px 0 14px; }
-  .match i { flex: 1; height: 26px; border-radius: 4px; background: var(--go); opacity: 0.8; }
-  .match i.d { background: var(--good); opacity: 1; }
-  .diff { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 0.86rem; margin-top: 8px; }
-  .diff .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-top: 6px; }
-  .diff s { color: var(--orig); text-decoration: none; }
-  .diff b { color: var(--good); font-weight: 600; }
 
   table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
   td { padding: 11px 0; border-bottom: 1px solid var(--line); }
@@ -77,6 +70,15 @@
   .steps pre { margin: 0; }
   .step { color: var(--muted); font-size: 0.82rem; margin-bottom: 8px; }
   .step span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--go); color: var(--bg); font-weight: 700; font-size: 0.72rem; margin-right: 8px; }
+  .split { display: flex; gap: 4px; height: 38px; margin-top: 4px; }
+  .split div { border-radius: 8px; background: var(--go); color: var(--bg); display: flex; align-items: center; padding: 0 14px; font-size: 0.9rem; white-space: nowrap; overflow: hidden; }
+  .split div b { font-size: 1.1rem; margin-right: 6px; }
+  .split .better { background: var(--good); padding: 0; min-width: 16px; }
+  .split-legend { display: flex; gap: 16px; color: var(--muted); font-size: 0.8rem; margin-top: 10px; }
+  .split-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--go); margin-right: 6px; }
+  .split-legend i.b { background: var(--good); } .split-legend i.w { background: var(--orig); }
+  .dt td { padding: 9px 0; font-size: 0.88rem; }
+  .dt td.x, .dt td.y { text-align: center; }
   @media (max-width: 900px) { .steps { grid-template-columns: 1fr; } }
   @media (max-width: 900px) { .g3, .g2 { grid-template-columns: 1fr; } main { padding: 36px 16px 60px; } }
 </style>
@@ -143,14 +145,19 @@
       </table>
     </div>
     <div class="card">
-      <h2>Same edits, same redis commands</h2>
-      <div class="big">35<small>/ 37 steps identical</small></div>
-      <div class="match" id="match"></div>
-      <div class="diff">
-        <span class="dot"></span><span><code>.svg</code> edit · <s>HYVA_SVG</s> → <b>HYVA_ICONS</b> (Hyvä's real tag)</span>
-        <span class="dot"></span><span>unchanged rewrite · <s>cleans config</s> → <b>skipped</b></span>
-        <span class="dot"></span><span><code>abstract class</code> · <s>interceptor kept</s> → <b>removed</b></span>
+      <h2>37 identical file edits, both tools</h2>
+      <div class="split">
+        <div style="flex:35"><b>35</b> same cache cleans</div>
+        <div class="better" style="flex:2"></div>
       </div>
+      <div class="split-legend"><span><i></i>35 same result</span><span><i class="b"></i>2 better</span><span><i class="w"></i>0 worse</span></div>
+      <h2 style="margin-top:26px">Where they differ</h2>
+      <table class="dt">
+        <tr><th></th><th>cache-clean.js</th><th>flushgopher</th></tr>
+        <tr><td>edit an <code>.svg</code></td><td class="x">wrong tag</td><td class="y">HYVA_ICONS</td></tr>
+        <tr><td>save without changes</td><td class="x">cleans config</td><td class="y">nothing</td></tr>
+        <tr><td>edit an <code>abstract class</code></td><td class="x">keeps interceptor</td><td class="y">removes it</td></tr>
+      </table>
       <h2 style="margin-top:28px">Usage</h2>
 <pre><b>flushgopher -w</b>          watch
 <b>flushgopher</b>             flush all
@@ -185,12 +192,6 @@ cd flushgopher</pre></div>
     const i = document.createElement('i');
     i.style.left = (t / 45 * 100) + '%';
     el.appendChild(i);
-  }
-  const m = document.getElementById('match');
-  for (let n = 0; n < 37; n++) {
-    const i = document.createElement('i');
-    if (n >= 35) { i.className = 'd'; i.title = 'differs, in flushgopher\'s favor'; }
-    m.appendChild(i);
   }
 </script>
 </body>
