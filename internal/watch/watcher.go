@@ -11,6 +11,7 @@
 package watch
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -63,6 +64,7 @@ type Watcher struct {
 	opts    Options
 
 	events  chan string
+	rescan  chan struct{}
 	gitDir  string
 	fs      *fsWatches
 	compDir map[string]components.Component // component dir → component
@@ -85,6 +87,7 @@ func New(app *magento.App, cleaner Cleaner, opts Options) *Watcher {
 		cleaner:     cleaner,
 		opts:        opts,
 		events:      make(chan string, 1<<16),
+		rescan:      make(chan struct{}, 1),
 		pending:     map[string]struct{}{},
 		static:      map[string]struct{}{},
 		gitDir:      gitDir(app.Base),
@@ -231,13 +234,7 @@ func (w *Watcher) Run(stop <-chan struct{}) {
 	comps, _ := w.loadComponents()
 	w.syncWatches()
 	go w.scanControllers()
-	counts := map[components.Type]int{}
-	for _, c := range comps {
-		counts[c.Type]++
-	}
-	logx.Event(logx.Notice, logx.CWatch, "WATCH", "%s modules · %s themes · %s language packs · %s watches",
-		logx.Bold(strconv.Itoa(counts[components.Module])), logx.Bold(strconv.Itoa(counts[components.Theme])),
-		logx.Bold(strconv.Itoa(counts[components.Language])), logx.Bold(strconv.Itoa(w.fs.count())))
+	logx.Event(logx.Notice, logx.CWatch, "WATCH", "%s", w.summary(comps))
 
 	tick := time.NewTicker(100 * time.Millisecond)
 	defer tick.Stop()
@@ -246,6 +243,8 @@ func (w *Watcher) Run(stop <-chan struct{}) {
 		case <-stop:
 			w.fs.closeAll()
 			return
+		case <-w.rescan:
+			w.doRescan()
 		case p := <-w.events:
 			w.event(p)
 		case <-tick.C:
@@ -605,16 +604,41 @@ func WarnIfAllCachesDisabled(app *magento.App) {
 	}
 }
 
-// Rescan re-discovers modules and themes and adds watches for new ones. The
-// config cache is cleaned if the module list changed.
-func (w *Watcher) Rescan() {
-	logx.Event(logx.Notice, logx.CWatch, "WATCH", "Rescanning modules and themes")
-	now := time.Now()
-	w.mu.Lock()
-	w.reload = true
-	if w.first.IsZero() {
-		w.first = now
+func (w *Watcher) summary(comps []components.Component) string {
+	counts := map[components.Type]int{}
+	for _, c := range comps {
+		counts[c.Type]++
 	}
-	w.last = now.Add(-w.opts.StormQuiet)
-	w.mu.Unlock()
+	n := func(i int) string { return logx.Bold(strconv.Itoa(i)) }
+	return fmt.Sprintf("%s modules · %s themes · %s language packs · %s watches",
+		n(counts[components.Module]), n(counts[components.Theme]), n(counts[components.Language]), n(w.fs.count()))
+}
+
+// Rescan asks the running watcher to re-discover modules and themes.
+func (w *Watcher) Rescan() {
+	select {
+	case w.rescan <- struct{}{}:
+	default: // one is already queued
+	}
+}
+
+// doRescan re-discovers modules and themes, adds watches for new ones and
+// cleans the config cache if the module list changed.
+func (w *Watcher) doRescan() {
+	logx.Event(logx.Notice, logx.CWatch, "WATCH", "Rescanning modules and themes…")
+	start := time.Now()
+	comps, changed := w.loadComponents()
+	w.syncWatches()
+	w.scanControllers()
+	if changed {
+		if err := w.cleaner.CleanTypes([]string{"config"}); err != nil {
+			logx.Event(logx.Error, logx.CErr, "ERROR", "%v", err)
+		}
+	}
+	result := "no changes"
+	if changed {
+		result = "module list changed"
+	}
+	logx.Event(logx.Notice, logx.COK, "DONE", "%s · %s %s", w.summary(comps), result,
+		logx.Dim("("+time.Since(start).Round(time.Millisecond).String()+")"))
 }
