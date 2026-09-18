@@ -84,7 +84,7 @@ make install   # copies bin/flushgopher to ~/.local/bin
 make test      # unit + integration tests (redis tests start their own redis-server)
 ```
 
-To run it as `cl`, like the workbench `cache-cleaner` alias:
+To run it as `cl`:
 
 ```
 echo "alias cl='$HOME/.local/bin/flushgopher -w'" >> ~/.zshrc && source ~/.zshrc
