@@ -76,6 +76,14 @@ nothing: batching replaces the flood guard.
 * Varnish: PURGE requests to `http_cache_hosts`
 * Integration test sandboxes
 
+## Config dump
+
+Like the original, flushgopher reads `var/cache-clean-config.json` instead of
+`env.php` and the module list when that file exists (the original's
+`generate-cache-clean-config.php` writes it). It is only needed when the
+Magento files are not where PHP sees them, e.g. inside a container with
+different paths.
+
 ## Build
 
 ```

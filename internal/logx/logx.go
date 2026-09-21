@@ -26,10 +26,12 @@ var (
 	verbosity           = Notice
 	out       io.Writer = os.Stdout
 	errOut    io.Writer = os.Stderr
-	// RawMode is set while the terminal is in raw mode (hotkeys), where
-	// newlines need an explicit carriage return.
-	RawMode bool
+	rawMode   bool
 )
+
+// SetRawMode is switched on while the terminal is in raw mode (hotkeys),
+// where newlines need an explicit carriage return.
+func SetRawMode(on bool) { mu.Lock(); rawMode = on; mu.Unlock() }
 
 func SetVerbosity(l Level) { mu.Lock(); verbosity = l; mu.Unlock() }
 func Verbosity() Level     { mu.Lock(); defer mu.Unlock(); return verbosity }
@@ -46,7 +48,7 @@ func write(l Level, withTime bool, format string, args ...any) {
 	msg = strings.TrimRight(msg, "\n") + "\n"
 	mu.Lock()
 	defer mu.Unlock()
-	if RawMode {
+	if rawMode {
 		msg = strings.ReplaceAll(msg, "\n", "\r\n")
 	}
 	w := out

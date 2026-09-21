@@ -180,6 +180,9 @@ func (w *Watcher) wantedWatches() map[string]bool {
 	add(w.p("app/i18n"), true)
 	add(w.p("app/etc"), false)
 	add(w.p("vendor/composer"), false)
+	if _, err := os.Stat(w.p(magento.DumpFile)); err == nil {
+		add(w.p("var"), false)
+	}
 	add(w.gitDir, false)
 	add(w.p("pub/static/frontend"), true)
 	// Drop entries covered by a recursive parent.
@@ -455,9 +458,9 @@ func analyze(files []string) []fileResult {
 }
 
 // ProcessFiles cleans caches for an explicit list of changed files (--file-list).
+// Controllers are not pre-scanned, so every listed controller counts as new.
 func (w *Watcher) ProcessFiles(files []string) {
 	w.loadComponents()
-	w.scanControllers()
 	w.process(files, false, false)
 }
 
@@ -468,9 +471,12 @@ func (w *Watcher) flush() {
 		_, changed := w.loadComponents()
 		cleanConfig = cleanConfig || changed
 		w.syncWatches()
-		go w.scanControllers()
 	}
 	w.process(files, cleanConfig, staticFPC)
+	if reload {
+		// After process, which must still see controllers of new modules as new.
+		go w.scanControllers()
+	}
 }
 
 func (w *Watcher) process(files []string, cleanConfig, staticFPC bool) {
@@ -502,6 +508,10 @@ func (w *Watcher) process(files []string, cleanConfig, staticFPC bool) {
 			w.controllers[r.file] = true
 			ids["app_action_list"] = true
 			types["full_page"] = true
+		}
+		if !r.exists && w.controllers[r.file] {
+			delete(w.controllers, r.file)
+			ids["app_action_list"] = true
 		}
 		if strings.HasSuffix(r.file, ".php") && r.exists {
 			phpFiles = append(phpFiles, r.file)

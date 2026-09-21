@@ -249,6 +249,32 @@ func TestNewControllerCleansActionList(t *testing.T) {
 	}
 }
 
+func TestRemovedControllerCleansActionList(t *testing.T) {
+	w, rec, _, mod := newTestWatcher(t)
+	f := filepath.Join(mod, "Controller/Index/Index.php")
+	if err := os.Remove(f); err != nil {
+		t.Fatal(err)
+	}
+	w.event(f)
+	settle(t, w)
+	got := rec.take()
+	want := []call{{"ids", []string{"app_action_list"}}}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestFileListTreatsControllersAsNew(t *testing.T) {
+	base, mod := fakeMagento(t)
+	rec := &recorder{}
+	New(magento.New(base), rec, DefaultOptions()).ProcessFiles([]string{filepath.Join(mod, "Controller/Index/Index.php")})
+	got := rec.take()
+	want := []call{{"types", []string{"full_page"}}, {"ids", []string{"app_action_list"}}}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
 func TestGeneratedCodeRemoved(t *testing.T) {
 	w, _, base, mod := newTestWatcher(t)
 	gen := filepath.Join(base, "generated/code/Acme/Shop/Model")

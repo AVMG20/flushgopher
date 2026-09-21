@@ -225,6 +225,29 @@ func showHotkeys() {
 	logx.PlainNotice("")
 }
 
+func handleKey(base string, key byte, cleaner *cache.Cleaner, w *watch.Watcher) {
+	switch key {
+	case 'G':
+		magento.CleanGeneratedCode(base)
+	case 'I':
+		magento.CleanIntegrationSandboxes(base)
+	case 'F':
+		magento.CleanStaticArea(base, "frontend")
+	case 'A':
+		magento.CleanStaticArea(base, "adminhtml")
+	case 'r':
+		w.Rescan()
+	case '?', 'h':
+		showHotkeys()
+	default:
+		if types, ok := keyTypes[key]; ok {
+			if err := cleaner.CleanTypes(types); err != nil {
+				logx.Event(logx.Error, logx.CErr, "ERROR", "%v", err)
+			}
+		}
+	}
+}
+
 func runWatch(app *magento.App, cleaner *cache.Cleaner, wopts watch.Options) {
 	banner(app.Base)
 	if disabled, all := app.DisabledCaches(); all {
@@ -238,32 +261,24 @@ func runWatch(app *magento.App, cleaner *cache.Cleaner, wopts watch.Options) {
 	done := make(chan struct{})
 	quit := make(chan struct{}, 1)
 
+	// Keys are handled by a worker so a slow clean never blocks quitting.
+	keys := make(chan byte, 16)
+	go func() {
+		for key := range keys {
+			handleKey(app.Base, key, cleaner, w)
+		}
+	}()
 	restore, ok := hotkeys.Start(func(key byte) {
-		base := app.Base
-		switch key {
-		case hotkeys.CtrlC, 'q':
+		if key == hotkeys.CtrlC || key == 'q' {
 			select {
 			case quit <- struct{}{}:
 			default:
 			}
-		case 'G':
-			magento.CleanGeneratedCode(base)
-		case 'I':
-			magento.CleanIntegrationSandboxes(base)
-		case 'F':
-			magento.CleanStaticArea(base, "frontend")
-		case 'A':
-			magento.CleanStaticArea(base, "adminhtml")
-		case 'r':
-			w.Rescan()
-		case '?', 'h':
-			showHotkeys()
-		default:
-			if types, ok := keyTypes[key]; ok {
-				if err := cleaner.CleanTypes(types); err != nil {
-					logx.Event(logx.Error, logx.CErr, "ERROR", "%v", err)
-				}
-			}
+			return
+		}
+		select {
+		case keys <- key:
+		default: // drop keys while the queue is full
 		}
 	})
 	if ok {
@@ -285,7 +300,10 @@ func runWatch(app *magento.App, cleaner *cache.Cleaner, wopts watch.Options) {
 	case <-quit:
 	}
 	close(stop)
-	<-done
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second): // a clean is stuck on a dead backend
+	}
 	restore()
 	logx.PlainNotice("%s bye!", logx.Paint(logx.CGopher, "ʕ-ϖ-ʔ"))
 }

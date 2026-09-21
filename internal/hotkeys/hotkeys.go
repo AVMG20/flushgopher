@@ -23,10 +23,10 @@ func Start(handle func(key byte)) (restore func(), ok bool) {
 		logx.Errorf("Error initializing hotkey support: %v", err)
 		return func() {}, false
 	}
-	logx.RawMode = true
+	logx.SetRawMode(true)
 	restore = func() {
 		term.Restore(fd, state)
-		logx.RawMode = false
+		logx.SetRawMode(false)
 	}
 	go func() {
 		buf := make([]byte, 16)
