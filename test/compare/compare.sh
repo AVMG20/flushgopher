@@ -12,6 +12,7 @@ GAP=${GAP:-7}          # > 5s so the original's flood guard never suppresses a s
 R() { redis-cli -s "$SOCK" "$@" >/dev/null; }
 mkdir -p "$OUT"
 
+# Example paths from a Magento install; adjust the list to match your own.
 files=(
   app/code/Acme/PdfTemplate/view/frontend/layout/pdf_order_items_table.xml
   app/code/Zenith/SecondBlogSitemap/view/adminhtml/templates/js.phtml
