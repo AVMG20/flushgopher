@@ -62,19 +62,21 @@ type envCache struct {
 type App struct {
 	Base string
 
-	mu     sync.Mutex
-	envs   map[string]envCache
-	prefix map[string]string
-	fpcBug map[string]bool
-	warned bool
+	mu      sync.Mutex
+	envs    map[string]envCache
+	prefix  map[string]string
+	fpcBug  map[string]bool
+	symfony map[string]bool
+	warned  bool
 }
 
 func New(base string) *App {
 	return &App{
-		Base:   filepath.Clean(base),
-		envs:   map[string]envCache{},
-		prefix: map[string]string{},
-		fpcBug: map[string]bool{},
+		Base:    filepath.Clean(base),
+		envs:    map[string]envCache{},
+		prefix:  map[string]string{},
+		fpcBug:  map[string]bool{},
+		symfony: map[string]bool{},
 	}
 }
 
@@ -285,6 +287,29 @@ func (a *App) fpcDirBugPresent(base string) bool {
 	return v
 }
 
+// symfonyCache reports whether Magento uses Symfony Cache instead of Zend_Cache
+// (2.4.9+). Detected by feature instead of by version, so patch releases and
+// forks are handled as well.
+func (a *App) symfonyCache(base string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if v, ok := a.symfony[base]; ok {
+		return v
+	}
+	v := false
+	for _, c := range []string{"lib/internal/Magento/Framework/Cache/Frontend/Adapter/SymfonyAdapterProvider.php", "vendor/magento/framework/Cache/Frontend/Adapter/SymfonyAdapterProvider.php"} {
+		if fileExists(filepath.Join(base, c)) {
+			v = true
+			break
+		}
+	}
+	if v {
+		logx.Debugf("Magento uses Symfony Cache")
+	}
+	a.symfony[base] = v
+	return v
+}
+
 func isFileBackend(cfg map[string]any) bool {
 	b := strings.TrimLeft(str(cfg["backend"]), `\`)
 	return b == "" || b == "Cm_Cache_Backend_File"
@@ -310,12 +335,19 @@ func (a *App) CacheConfig(base, frontend string) (storage.Config, error) {
 		}
 	}
 	cfg["backend_options"] = opts
+	symfony := a.symfonyCache(base)
+	if symfony {
+		cfg[storage.SymfonyKey] = true
+		cfg[storage.SymfonyTagDirKey] = filepath.Join(base, "var/cache/symfony/tags")
+	}
 	// Like storage.New: without a backend name but with a server, it is redis.
 	fileBackend := isFileBackend(cfg) && str(opts["server"]) == ""
-	if fileBackend {
+	if fileBackend && !symfony {
 		cfg["backend"] = "Cm_Cache_Backend_File"
 	}
-	if fileBackend && str(opts["cache_dir"]) == "" {
+	// Symfony Cache falls back to the filesystem whenever redis is not
+	// selected or not reachable, so it always needs the cache_dir.
+	if (fileBackend || symfony) && str(opts["cache_dir"]) == "" {
 		dir := "cache"
 		if frontend == "page_cache" {
 			dir = "page_cache"

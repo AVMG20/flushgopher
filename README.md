@@ -76,6 +76,17 @@ nothing: batching replaces the flood guard.
 * Varnish: PURGE requests to `http_cache_hosts`
 * Integration test sandboxes
 
+Magento 2.4.9 replaced Zend_Cache with Symfony Cache, which stores records and
+tags differently. flushgopher detects this by the presence of
+`SymfonyAdapterProvider.php` and then cleans the Symfony data model instead:
+
+* Redis/Valkey: only for the backend names `redis` and `valkey`, as in Magento.
+  Magento silently falls back to the file cache when it cannot use redis (for
+  example with a unix socket, or a backend class name such as
+  `Magento\Framework\Cache\Backend\Redis`), so that location is cleaned as well.
+* File: Symfony's `FilesystemAdapter` in `<cache_dir>/<id_prefix>/`, with the
+  tags in `var/cache/symfony/tags/`.
+
 ## Config dump
 
 Like the original, flushgopher reads `var/cache-clean-config.json` instead of

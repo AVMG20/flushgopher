@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"flushgopher/internal/storage"
 )
 
 func write(t *testing.T, path, body string) {
@@ -65,6 +67,32 @@ func TestCacheConfigRedisAndRelativeDir(t *testing.T) {
 	}
 	if got, want := opt(t, a, "page_cache", "cache_dir"), filepath.Join(base, "var/fpc"); got != want {
 		t.Errorf("cache_dir = %q, want %q", got, want)
+	}
+}
+
+func TestCacheConfigSymfony(t *testing.T) {
+	base, _ := filepath.EvalSymlinks(t.TempDir())
+	write(t, filepath.Join(base, "app/etc/env.php"), `<?php return ['cache' => ['frontend' => [
+		'default' => ['backend' => 'valkey', 'id_prefix' => 'abc_', 'backend_options' => ['server' => '127.0.0.1', 'port' => '6379']],
+	]]];`)
+	write(t, filepath.Join(base, "vendor/magento/framework/Cache/Frontend/Adapter/SymfonyAdapterProvider.php"), "<?php")
+	a := New(base)
+	cfg, err := a.CacheConfig(base, "default")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg[storage.SymfonyKey] != true || cfg[storage.SymfonyTagDirKey] != filepath.Join(base, "var/cache/symfony/tags") {
+		t.Errorf("symfony keys missing: %v", cfg)
+	}
+	if cfg["backend"] != "valkey" {
+		t.Errorf("backend = %v, want valkey", cfg["backend"])
+	}
+	// Needed for the file fallback, also with redis configured.
+	if got, want := opt(t, a, "default", "cache_dir"), filepath.Join(base, "var/cache"); got != want {
+		t.Errorf("default cache_dir = %q, want %q", got, want)
+	}
+	if got, want := opt(t, a, "page_cache", "cache_dir"), filepath.Join(base, "var/page_cache"); got != want {
+		t.Errorf("page_cache cache_dir = %q, want %q", got, want)
 	}
 }
 
