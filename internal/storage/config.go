@@ -21,10 +21,14 @@ const (
 //   - Cm_Cache_Backend_Redis / Magento\Framework\Cache\Backend\Redis → redis
 //   - Magento\Framework\Cache\Backend\RemoteSynchronizedCache → remote then local
 //   - anything else: redis when backend_options.server is set, else the file backend.
+//   - Magento 2.4.9+ (Symfony Cache, marked with SymfonyKey): see newSymfony.
 //
 // Backend names are compared case-insensitively, ignoring leading backslashes.
 // No connection is made until the first operation.
 func New(cfg Config) (Storage, error) {
+	if cfg[SymfonyKey] == true {
+		return newSymfony(cfg)
+	}
 	switch normalizeBackend(str(cfg["backend"])) {
 	case backendCmRedis, backendMagentoRedis:
 		return newRedis(cfg)
